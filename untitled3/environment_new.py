@@ -14,15 +14,9 @@ class ForEnvir:
         self.length, self.colnums = self.data.shape
         self.currentStep = 0
 
-        #x_train = [[], [], [], [], [], [], [], [], [], [], [], [], []]
-        #x_test = [[], [], [], [], [], [], [], [], [], [], [], [], []]
-
-
         (trainNum, null) = divmod(self.length * 8, 10)  # divide the data into training and test sets
 
-
-        self.x_train = self.data.iloc[
-                  0:trainNum]  # split it into 2 data sets to test on and prevent over-fitting
+        self.x_train = self.data.iloc[0:trainNum]  # split it into 2 data sets to test on and prevent over-fitting
         self.x_trainAug = self.data.iloc[
                      0:trainNum + 1]  # split it into 2 data sets to test on and prevent over-fitting
         self.x_test = self.data.iloc[trainNum:self.length - 1]
