@@ -7,10 +7,10 @@ class ForEnvir:
     def __init__(self):
 
         path = "data/GBPUSD.csv"
-        colnames = ['close', 'Open', 'High', 'Low', 'SMA200', 'EMA15', 'EMA12', 'EMA26',
-                    'MACD', 'bollinger_band_upper_3sd_200', 'bollinger_band_lower_3sd_200', 'stochK',
-                    'stockD']
-        self.data = pd.read_csv(path, names=colnames)  # load data
+        self.colnames = ['Close', 'Open', 'High', 'Low', 'SMA200', 'EMA15', 'EMA12', 'EMA26',
+                    'MACD', 'Bollinger_band_upper_3sd_200', 'bollinger_band_lower_3sd_200', 'StochK',
+                    'StockD']
+        self.data = pd.read_csv(path, names=self.colnames)  # load data
         self.length, self.colnums = self.data.shape
         self.currentStep = 0
 
@@ -18,7 +18,7 @@ class ForEnvir:
 
         self.x_train = self.data.iloc[0:trainNum]  # split it into 2 data sets to test on and prevent over-fitting
         self.x_trainAug = self.data.iloc[
-                     0:trainNum + 1]  # split it into 2 data sets to test on and prevent over-fitting
+                          0:trainNum + 1]  # split it into 2 data sets to test on and prevent over-fitting
         self.x_test = self.data.iloc[trainNum:self.length - 1]
         self.x_test_aug = self.data.iloc[trainNum:self.length]
         self.trainLen = len(self.x_train)
@@ -30,117 +30,126 @@ class ForEnvir:
         self.direction = 0
         self.amount = 300
         self.isopen = 0
+        self.Updatebars()
+        # self.close = 0
+        # self.open = 0
+        # self.high = 0
+        # self.low = 0
+        # self.sma200 = 0
+        # self.ema15 = 0
+        # self.ema12 = 0
+        # self.ema26 = 0
+        # self.macd = 0
+        # self.bollingerbandupper3sd200 = 0
+        # self.bollingerbandlower3sd200 = 0
+        # self.stochK = 0
+        # self.stockD = 0
 
-        self.close = 0
-        self.open = 0
-        self.high = 0
-        self.low = 0
-        self.SMA200 = 0
-        self.EMA15 = 0
-        self.EMA12 = 0
-        self.EMA26 = 0
-        self.MACD = 0
-        self.bollingerbandupper3sd200 = 0
-        self.bollingerbandlower3sd200 = 0
-        self.stochK = 0
-        self.stockD = 0
-
+    #
     # to close a trade
-    def close(self, newstart, newendpip):
+    def Close(self):
         bal = self.balance
-        self.endpip = newendpip
+        self.endpip = self.data.Close[self.currentStep]
         if self.isopen == 1:  # if there is a trade open
             if self.direction == 1:  # if it is going up
-                self.balance = self.balance + (self.endpip/self.startpip)*self.amount  # close it and add +/- to balance
+                self.balance = self.balance + (
+                        self.endpip / self.startpip) * self.amount  # close it and add +/- to balance
             else:
-                self.balance = self.balance + (self.startpip/self.endpip)*self.amount
+                self.balance = self.balance + (self.startpip / self.endpip) * self.amount
             self.isopen = 0
-            reward = self.balance-bal  # dif of balance
-        else:   #if there is no trade open there is no reward
+            reward = self.balance - bal  # dif of balance
+        else:  # if there is no trade open there is no reward
             return -5
-        self.updateBars(newstart, newendpip)
+        self.Updatebars()
         return reward - 5
 
     # direction is a boolean of 1 being up 0 being down
-    def buy(self, newstart, newendpip):
-        rew =-10
+    def Buy(self):
+        rew = -10
         if self.isopen == 0:
-            self.updateBars(newstart, newendpip)
+            self.Updatebars()
             self.balance = self.balance - self.amount
             self.isopen = 1
             self.direction = 1
             rew = 0
         else:
-            if self.direction == 0:# if it is the oposite
-                rew = self.close(newstart,newendpip)
-                self.updateBars(newstart, newendpip)
+            if self.direction == 0:  # if it is the oposite
+                rew = self.Close()
+                self.Updatebars()
                 self.balance = self.balance - self.amount
                 self.isopen = 1
                 self.direction = 1
-
         return rew
 
-    def sell(self,newstart, newendpip):
+    def Sell(self):
         rew = -10
         if self.isopen == 0:
-            self.updateBars(newstart, newendpip)
+            self.Updatebars()
             self.balance = self.balance - self.amount
             self.isopen = 1
             self.direction = 0
             rew = 0
-        else:# if there is a trade open
-            if self.direction == 1:# if it is the oposite
-                rew = self.close(newstart,newendpip)
-                self.updateBars(newstart, newendpip)
+        else:  # if there is a trade open
+            if self.direction == 1:  # if it is the oposite
+                rew = self.Close()
+                self.Updatebars()
                 self.balance = self.balance - self.amount
                 self.isopen = 1
                 self.direction = 0
         return rew
 
-    def hold(self, newstart, newendpip):
-        self.updateBars(newstart, newendpip)
-        return self.balance*(1/1000000)
-
-    def updatebars(self, newstartPip, newendPip):
-        if self.isopen == 1:
-            self.endpip = newendPip
+    def Hold(self):
+        if self.isopen == 0:
+            self.Updatebars()
         else:
-            self.startpip = newstartPip
-            self.endpip = newendPip
+            self.close = self.data.Close[self.currentStep]
+        return self.balance * (1 / 1000000)
 
-    def getact(self, action):
+    def Updatebars(self):
+        if self.isopen == 1:
+            self.endpip = self.data.Close[self.currentStep]
+        else:
+            self.startpip = self.data.Open[self.currentStep]
+            self.endpip = self.data.Close[self.currentStep]
+
+    def Getact(self, action):
         if action == 0:
-            rew = "sell"
+            actName = "sell"
         elif action == 1:
-            rew = "buy"
+            actName = "buy"
         elif action == 2:
-            rew = "hold"
+            actName = "hold"
         elif action == 3:
-            rew = "close"
+            actName = "close"
+        return actName
+
+    def Takeact(self, action):
+        if action == 0:
+            rew = self.Sell()
+        elif action == 1:
+            rew = self.Buy()
+        elif action == 2:
+            rew = self.Hold()
+        elif action == 3:
+            rew = self.Close()
         return rew
 
-    def takeact(self, action, newStart, newEnd):
-        if action == 0:
-            rew = self.sell(newStart, newEnd)
-        elif action == 1:
-            rew = self.buy(newStart, newEnd)
-        elif action == 2:
-            rew = self.hold(newStart, newEnd)
-        elif action == 3:
-            rew = self.close(newStart, newEnd)
-        return rew
-
-    def getstate(self):
+    def Getstate(self):
         retval = self.data.iloc[self.currentStep]
         retval = retval.append(pd.Series([self.isopen, self.direction]))
         retval = retval.rename({0: 'isopen', 1: 'direction'})
         return retval.to_frame().T
 
-    def nextstate(self, action):
+    def Nextstate(self):
         self.currentStep += 1
 
-    def peakNextState(self):
+    def PeakNextState(self):
         retval = self.data.iloc[self.currentStep + 1]
         retval = retval.append(pd.Series([self.isopen, self.direction]))
         retval = retval.rename({0: 'isopen', 1: 'direction'})
         return retval.to_frame().T
+    def resetenv(self):
+        self.currentStep = 0
+        self.balance = 1000000
+        self.isopen = 0
+        self.Updatebars()

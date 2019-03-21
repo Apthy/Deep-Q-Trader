@@ -1,9 +1,11 @@
 from __future__ import print_function
 import numpy as np
+from numpy import empty
 import pandas as pd
 from model import *
 from math import log
 from environment_new import ForEnvir
+from keras.models import load_model
 from keras.callbacks import TensorBoard
 from random import random, randint
 
@@ -12,12 +14,13 @@ def epsilonGreed(greedChance, nextQ):
 
     if greedChance >= random():  # if it is greedy pick the best
         QVal = max(nextQ)
-        for i in range(0, 4):  # find the action assosiated with this qval
-            if QVal == nextQ(i):
+        for i in range(0, outputs):  # find the action assosiated with this qval
+
+            if QVal == nextQ[i]:
                 act = i  # the action associated to the maxQval
     else:  # else pick a random
-        act = randint(0, 3)
-        QVal = nextQ[0, act]
+        act = randint(0, outputs-1)
+        QVal = nextQ[act]
     return act, QVal
 
 #def epsilonGreed(greedChance, nextQ):
@@ -39,16 +42,17 @@ def epsilonGreed(greedChance, nextQ):
 #    return actions, actionQVal
 
 # calculate the forward training values by using the next action as the next state
+
+
 def findQdif(action, actionQVal, discount, alpha, currentQ, nextQ):
     # for n in range(0, len(augmented)-1):
-    nextState = env.peakNextState()
-    newendpip = nextState.close
-    newstartpip = nextState.Open
-    nextreward = takeAct(action, newstartpip, newendpip)
-    newQ = actionQVal + (alpha * (nextreward + (discount * max(nextQ)) - actionQVal))
-    print("act", getact(action),"rew", nextreward,"diff", newQ - currentQ[action], "Qval", currentQ[action])
-    currentQ[action] = newQ
+    nextreward = env.Takeact(action)
+    newQValue = actionQVal + (alpha * (nextreward + (discount * max(nextQ.T)) - actionQVal))
+
+    # print("act", env.Getact(action), "rew", nextreward, "diff", newQValue - currentQ[action], "Qval", currentQ[action])
+    currentQ[action] = newQValue
     return currentQ
+
 
 def getact(action):
     if action == 0:
@@ -61,60 +65,62 @@ def getact(action):
         rew = "close"
     return rew
 
-def takeAct(action, newStart, newEnd):
-    if action == 0:
-        rew = env.sell(newStart, newEnd)
-    elif action == 1:
-        rew = env.buy(newStart, newEnd)
-    elif action == 2:
-        rew = env.hold(newStart, newEnd)
-    elif action == 3:
-        rew = env.close(newStart, newEnd)
-    return rew
 
-
-episodes = 90
+episodes = 5
 alpha = 0.2
 discount = 1
-
-env = ForEnvir()
-print(env.colnums)
+save = 1
+#print(env.colnums)
 inputNode = 15
 layers = 20
 outputs = 4
 layer_depth = 32
-
+env = ForEnvir()
 model = mlp(inputNode, outputs, layers, layer_depth)  # make an mlp
-print(env.getstate())
+model = load_model('my_model.h5')
+#print(env.Getstate())
+percent = 0
+for p in range(0, episodes):# for each episode
 
-for p in range(0, episodes):  # for each episode
-    traininput = [[],[],[],[],[],[],[],[],[],[],[],[],[],[],[]]
-    curQ = [[],[],[],[]]
+    traininput = pd.DataFrame(columns=['Close', 'Open', 'High', 'Low', 'SMA200', 'EMA15', 'EMA12', 'EMA26',
+                    'MACD', 'Bollinger_band_upper_3sd_200', 'bollinger_band_lower_3sd_200', 'StochK',
+                    'StockD','isopen', 'direction'])
+    curQ = np.array(empty([env.trainLen,4]))
     print("EPISODE",p)
     # init
+
+    greedChance = 0.9 * log(p + 1, episodes)
     for i in range(0,env.trainLen):
-        stepvals = env.getstate()
-        print(stepvals.shape)
-        traininput[i] = stepvals
-        curQ[i] = model.predict(env.getstate())  # get q values of the pass
-        nextQ = model.predict(env.peakNextState())  # get q values of the pass
-        greedChance = 0.9 * log(p+1, episodes)
+
+        if percent !=int(100*((i)/(env.trainLen))):
+            print(int(100*((i)/(env.trainLen))))
+        percent= int(100*((i)/(env.trainLen)))
+        stepvals = env.Getstate()
+        #print(stepvals.shape)
+        traininput = traininput.append(stepvals)
+        curQprint = (model.predict(env.Getstate())[0, :])
+
+        curQ[i] = (model.predict(env.Getstate())[0])  # get q values of the pass
+
+        nextQ = model.predict(env.PeakNextState())[0,:]  # get q values of the next pass
         (actions, actionQVal) = epsilonGreed(greedChance, curQ[i])  #select the action you want to take
 
         # calculate the q target values
 
         # update the target list
         curQ[i] = findQdif(actions, actionQVal, discount, alpha, curQ[i], nextQ)
-
+        env.Nextstate()
     #curQ = np.delete(curQ, le, axis=0)  # delete the final row
 
     # to train, take an action get a reward
 
-    tfcb = TensorBoard(log_dir='/TensorBoardResults/'+str(p)+"/", histogram_freq=0,
-                       write_graph=True, write_images=True)
-
-    model.fit(traininput, curQ, epochs=5, callbacks=[tfcb])
-
+    #tfcb = TensorBoard(log_dir='/TensorBoardResults/'+str(p)+"/", histogram_freq=0,
+    #                   write_graph=True, write_images=True)
+    model.fit(traininput, curQ, epochs=5)
+    if save ==1:
+        model.save('my_model.h5')
+    print(env.balance)
+    env.resetenv()
 #once you change the course
 curQ = model.predict(x_test_aug, 1)  # get the current output of the network
 actionQVal = []
