@@ -28,7 +28,7 @@ class ForEnvir:
         self.startpip = 0.00
         self.endpip = 0.00
         self.direction = 0
-        self.amount = 1000
+        self.amount = 10000
         self.isopen = 0
         self.Updatebars()
         # self.close = 0
@@ -63,7 +63,7 @@ class ForEnvir:
             return -5
         #print('Direction:', self.direction, ' difference:', reward, '  open:', self.startpip, ' close:', self.endpip)
         #self.Updatebars()
-        return reward - 5
+        return reward*5
 
     # direction is a boolean of 1 being up 0 being down
     def Buy(self):
