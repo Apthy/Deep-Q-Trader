@@ -28,7 +28,7 @@ class ForEnvir:
         self.startpip = 0.00
         self.endpip = 0.00
         self.direction = 0
-        self.amount = 300
+        self.amount = 1000
         self.isopen = 0
         self.Updatebars()
         # self.close = 0
@@ -49,30 +49,32 @@ class ForEnvir:
     # to close a trade
     def Close(self):
         bal = self.balance
-        self.endpip = self.data.Close[self.currentStep]
+        #self.endpip = self.data.Close[self.currentStep]
         if self.isopen == 1:  # if there is a trade open
             if self.direction == 1:  # if it is going up
                 self.balance = self.balance + (
                         self.endpip / self.startpip) * self.amount  # close it and add +/- to balance
-            else:
+            else:  # going down
                 self.balance = self.balance + (self.startpip / self.endpip) * self.amount
             self.isopen = 0
-            reward = self.balance - bal  # dif of balance
+            reward = (self.balance - bal) - self.amount  # dif of balance
+
         else:  # if there is no trade open there is no reward
             return -5
-        self.Updatebars()
+        #print('Direction:', self.direction, ' difference:', reward, '  open:', self.startpip, ' close:', self.endpip)
+        #self.Updatebars()
         return reward - 5
 
     # direction is a boolean of 1 being up 0 being down
     def Buy(self):
-        rew = -10
-        if self.isopen == 0:
-            self.Updatebars()
+        rew = -1
+        if self.isopen == 0:  # no trade open
+            #self.Updatebars()
             self.balance = self.balance - self.amount
             self.isopen = 1
             self.direction = 1
             rew = 0
-        else:
+        else:  # trade open
             if self.direction == 0:  # if it is the oposite
                 rew = self.Close()
                 self.Updatebars()
@@ -82,15 +84,15 @@ class ForEnvir:
         return rew
 
     def Sell(self):
-        rew = -10
+        rew = -1
         if self.isopen == 0:
-            self.Updatebars()
+            #self.Updatebars()
             self.balance = self.balance - self.amount
             self.isopen = 1
             self.direction = 0
             rew = 0
         else:  # if there is a trade open
-            if self.direction == 1:  # if it is the oposite
+            if self.direction == 1:  # if it is the opposite
                 rew = self.Close()
                 self.Updatebars()
                 self.balance = self.balance - self.amount
@@ -99,11 +101,7 @@ class ForEnvir:
         return rew
 
     def Hold(self):
-        if self.isopen == 0:
-            self.Updatebars()
-        else:
-            self.close = self.data.Close[self.currentStep]
-        return self.balance * (1 / 1000000)
+        return 0
 
     def Updatebars(self):
         if self.isopen == 1:
@@ -142,13 +140,15 @@ class ForEnvir:
 
     def Nextstate(self):
         self.currentStep += 1
+        self.Updatebars()
 
     def PeakNextState(self):
         retval = self.data.iloc[self.currentStep + 1]
         retval = retval.append(pd.Series([self.isopen, self.direction]))
         retval = retval.rename({0: 'isopen', 1: 'direction'})
         return retval.to_frame().T
-    def resetenv(self):
+
+    def Resetenv(self):
         self.currentStep = 0
         self.balance = 1000000
         self.isopen = 0

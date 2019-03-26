@@ -1,6 +1,7 @@
 from __future__ import print_function
 import numpy as np
 from numpy import empty
+import matplotlib.pyplot as plt
 import pandas as pd
 from model import *
 from math import log
@@ -48,8 +49,9 @@ def findQdif(action, actionQVal, discount, alpha, currentQ, nextQ):
     # for n in range(0, len(augmented)-1):
     nextreward = env.Takeact(action)
     newQValue = actionQVal + (alpha * (nextreward + (discount * max(nextQ.T)) - actionQVal))
-
-    # print("act", env.Getact(action), "rew", nextreward, "diff", newQValue - currentQ[action], "Qval", currentQ[action])
+    #print(stepvals)
+    #print("act", env.Getact(action), "rew", nextreward, "diff", newQValue - currentQ[action], "Qval", currentQ[action])
+    #print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     currentQ[action] = newQValue
     return currentQ
 
@@ -66,21 +68,26 @@ def getact(action):
     return rew
 
 
-episodes = 5
-alpha = 0.2
+episodes = 290
+alpha = 1
 discount = 1
 save = 1
 #print(env.colnums)
 inputNode = 15
-layers = 20
+layers = 100
 outputs = 4
-layer_depth = 32
+layer_depth = 128
 env = ForEnvir()
 model = mlp(inputNode, outputs, layers, layer_depth)  # make an mlp
-model = load_model('my_model.h5')
+#model = load_model('my_model.h5')
 #print(env.Getstate())
 percent = 0
+finalBal = []
+count = []
+fig = plt.figure()
+
 for p in range(0, episodes):# for each episode
+
 
     traininput = pd.DataFrame(columns=['Close', 'Open', 'High', 'Low', 'SMA200', 'EMA15', 'EMA12', 'EMA26',
                     'MACD', 'Bollinger_band_upper_3sd_200', 'bollinger_band_lower_3sd_200', 'StochK',
@@ -89,13 +96,16 @@ for p in range(0, episodes):# for each episode
     print("EPISODE",p)
     # init
 
-    greedChance = 0.9 * log(p + 1, episodes)
-    for i in range(0,env.trainLen):
+    greedChance = .8#0.9 * log(p + 1, episodes)
+    for i in range(0, env.trainLen):
+        #  calculate percentages
+        newP =int(100*((i)/(env.trainLen)))
+        if percent != newP:
+            print(i, '/', env.trainLen)
+        percent = newP
+        #  Q-learning
+        stepvals = env.Getstate()#get the current state
 
-        if percent !=int(100*((i)/(env.trainLen))):
-            print(int(100*((i)/(env.trainLen))))
-        percent= int(100*((i)/(env.trainLen)))
-        stepvals = env.Getstate()
         #print(stepvals.shape)
         traininput = traininput.append(stepvals)
         curQprint = (model.predict(env.Getstate())[0, :])
@@ -114,13 +124,18 @@ for p in range(0, episodes):# for each episode
 
     # to train, take an action get a reward
 
-    #tfcb = TensorBoard(log_dir='/TensorBoardResults/'+str(p)+"/", histogram_freq=0,
-    #                   write_graph=True, write_images=True)
-    model.fit(traininput, curQ, epochs=5)
-    if save ==1:
+    tfcb = TensorBoard(log_dir='/TensorBoardResults/'+str(p)+"/", histogram_freq=0,
+                       write_graph=True, write_images=True)
+    model.fit(traininput, curQ, epochs=10, callbacks=[tfcb])
+    if save == 1:
         model.save('my_model.h5')
+    finalBal.append(env.balance)
+    count.append(p)
     print(env.balance)
-    env.resetenv()
+    env.Resetenv()
+    plt.axis([0, episodes, 990000, 1005000])
+    plt.plot(count, finalBal)
+    plt.show()
 #once you change the course
 curQ = model.predict(x_test_aug, 1)  # get the current output of the network
 actionQVal = []
