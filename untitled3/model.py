@@ -1,6 +1,6 @@
 from keras.models import Sequential
 from keras.layers import *
-from keras.optimizers import Adam, SGD
+from keras.optimizers import Adam, RMSprop
 
 
 def mlp(n_obs, n_action, n_hidden_layer=1, n_neuron_per_layer=32,
@@ -9,9 +9,9 @@ def mlp(n_obs, n_action, n_hidden_layer=1, n_neuron_per_layer=32,
     model.add(Dense(n_neuron_per_layer, input_dim=n_obs, activation=activation))
     for _ in range(n_hidden_layer):
         model.add(Dense(n_neuron_per_layer, activation=activation))
-        #model.add(Dropout(0.1))
     model.add(Dense(n_action, activation='linear'))
-    model.compile(loss=loss, optimizer=Adam(lr=0.001))
+
+    model.compile(loss=loss, optimizer=Adam())
     print(model.summary())
     return model
 
