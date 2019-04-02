@@ -31,7 +31,7 @@ class ForEnvir:
         self.startpip = 0.00
         self.endpip = 0.00
         self.direction = -1
-        self.amount = 1000
+        self.amount = 100
         self.isopen = 0
         self.Updatebars()
         # self.close = 0

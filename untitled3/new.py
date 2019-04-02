@@ -35,23 +35,27 @@ def epsilonGreed(greedChance, qcolumn):
     return act, QVal
 
 
-def findQdif(Action, CurrentQVal, Discount, Alpha, CurrentQ, NextQ):
+def findQdif(Action, CurrentQVal, Discount, Alpha, CurrentQ, NextQ, Nextreward):
     # for n in range(0, len(augmented)-1):
-    nextreward = env.Takeact(Action)
-    nextact = actFromQ(max(NextQ.T), NextQ[0,:])
+    nextact = actFromQ(max(NextQ.T), NextQ)
     if (nextact == 3) & (env.isopen == 1):
         futureReward = env.GetTradeVal(env.currentStep+1)
     elif (nextact == 2):
         futureReward = env.GetTradeVal(env.currentStep+1)*0.1
     else:
         futureReward = 0
-    newQValue = CurrentQVal + (Alpha * (nextreward + (Discount *futureReward) - CurrentQVal))
+    newQValue = CurrentQVal + (Alpha * (Nextreward + (Discount *max(NextQ.T)) - CurrentQVal))
     #print(stepvals)
     #print("act", env.Getact(Action), "rew", nextreward, "diff", newQValue - CurrentQ[Action], "Qval", CurrentQ[Action])
     #print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     CurrentQ[int(Action)] = newQValue
     return CurrentQ
 
+def train(Qnetwork,TDnet,state,action,reward,nextState):
+    qVals = Qnetwork.predict(state)
+    nextq = TDnet.predict(nextState)
+    findQdif(action, qVals[action], discount, alpha, qVals, nextq,
+             reward)
 
 def getact(action):
     if action == 0:
@@ -67,8 +71,8 @@ def getact(action):
 
 
 episodes = 100
-alpha = 0.0005
-discount = 0.3
+alpha = 0.005
+discount = 0.8
 save = 1
 #print(env.colnums)
 inputNode = 4
@@ -88,21 +92,12 @@ target = load_model('untrained.h5')
 percent = 0
 finalBal = []
 count = []
-#trainLen =100
-#predinput = env.netinputs['Open'].drop(env.length-1)[0:trainLen].values
-#predinput = [predinput, env.netinputs['Close'].drop(env.length-1)[0:trainLen].values]
+actions = np.array(empty([env.trainLen*episodes]))
+curQ = np.array(empty([env.trainLen*episodes,outputs]))
+nextQ = np.array(empty([env.trainLen*episodes,outputs]))
+nextreward = np.array(empty([env.trainLen*episodes,1]))
 
-#predinput = predinput.drop(env.length-1)
-#predoutput = env.netinputs['Close'].drop(0).values
-
-#vals =predinput[0:trainLen,0:trainLen]
-#bp.fit(predinput,predoutput[0:trainLen],epochs=10,validation_split=0.8)
-#print(bp.evaluate(predinputopen[trainLen:len(predoutput)],predoutput[trainLen:len(predoutput)]))
-#for i in range(trainLen,len(predinputopen)):
-#    inp = predinputopen[i:i+1]
-    #bp.predict(inp.values)#
-#    print(bp.predict(inp.values),predoutput[i:i+1].values)
-
+traininput = pd.DataFrame(columns=['Close', 'Open', 'isopen', 'direction'])
 for p in range(0, episodes):# for each episode
 
     #colnums = env.data.columns.values
@@ -111,11 +106,9 @@ for p in range(0, episodes):# for each episode
     #traininput = pd.DataFrame(columns=['Close', 'Open', 'SMA200',
     #                'MACD', 'Bollinger_band_upper_3sd_200', 'bollinger_band_lower_3sd_200', 'StochK',
     #                'StockD','isopen','direction'])
-    traininput = pd.DataFrame(columns=['Close', 'Open', 'isopen', 'direction'])
-    curQ = np.array(empty([env.trainLen,outputs]))
+
     print("EPISODE",p)
     # init
-    actions = np.array(empty([env.trainLen]))
     greedChance = 0.7 + 0.2 * log(p + 1, episodes)
     start = time.time()
 
@@ -128,19 +121,21 @@ for p in range(0, episodes):# for each episode
           #Q-learning
         stepvals = env.Getstate()#get the current state
         traininput = traininput.append(stepvals)
-        curQ[i] = (Qnet.predict(env.Getstate()))  # get q values of the pass
+        curQ[i+p*episodes] = (Qnet.predict(env.Getstate()))  # get q values of the pass
 
         #print('\n\n\n\n\n', env.PeakNextState(),'\n\n\n\n\n')
 
 
-        (actions[i], actionQVal) = epsilonGreed(greedChance, curQ[i])
+        (actions[i+p*episodes], actionQVal) = epsilonGreed(greedChance, curQ[i+p*episodes])
         # calculate the q target values
-        nextQ = target.predict(env.PeakNextState(actions[i]))  # get q values of the next pass
+        nextQ[i+p*episodes] = target.predict(env.PeakNextState(actions[i+p*episodes]))  # get q values of the next pass
+
         # update the target list
-        curQ[i] = findQdif(actions[i], actionQVal, discount, alpha, curQ[i], nextQ)
+        nextreward[i+p*episodes] = env.Takeact(actions[i+p*episodes])
+        curQ[i+p*episodes] = findQdif(actions[i+p*episodes], actionQVal, discount, alpha, curQ[i+p*episodes], nextQ[i+p*episodes],nextreward[i+p*episodes])
 
         outtest = np.array(empty([1, outputs]))
-        outtest[0] = curQ[i]
+        outtest[0] = curQ[i+p*episodes]
 
         inTest = np.array(empty([1,inputNode]))
         inTest[0] = stepvals.iloc[0].values
