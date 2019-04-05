@@ -75,13 +75,10 @@ class ForEnvir:
         endpip = self.data.Close[curstep]
         if self.isopen == 1:  # if there is a trade open
             if self.direction == 1:  # if it is going up
-                dif = self.endpip - self.startpip
-                newBal = self.balance + (1+dif) * self.amount  # close it and add +/- to balance
+                dif = endpip - self.startpip
             else:  # going down
-                dif = self.startpip - self.endpip
-                newBal = self.balance + (1+dif) * self.amount
-
-            reward = (newBal - bal) - self.amount  # change of balance
+                dif = self.startpip - endpip
+            reward = (1+dif) * self.amount  # change of balance
         else:  # if there is no trade open there is no reward
             return -1
         return reward/self.amount
@@ -124,7 +121,7 @@ class ForEnvir:
         return rew
 
     def Hold(self):
-        return self.GetTradeVal(self.currentStep)*0.1
+        return 0
 
     def TestSell(self):
         if self.isopen == 0:

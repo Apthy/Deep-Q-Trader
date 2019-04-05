@@ -32,38 +32,35 @@ def epsilonGreed(greedChance, qcolumn):
     else:  # else pick a random
         act = randint(0, outputs-1)
         QVal = qcolumn[act]
-    return act, QVal
+    return int(act), QVal
 
 
 def findQdif(Action, Discount, Alpha, CurrentQ, NextQ, Nextreward):
     # for n in range(0, len(augmented)-1):
     CurrentQVal = CurrentQ[Action]
-    nextact = actFromQ(max(NextQ.T), NextQ)
-    if (nextact == 3) & (env.isopen == 1):
-        futureReward = env.GetTradeVal(env.currentStep+1)
-    elif (nextact == 2):
-        futureReward = env.GetTradeVal(env.currentStep+1)*0.1
-    else:
-        futureReward = 0
     newQValue = CurrentQVal + (Alpha * (Nextreward + (Discount *max(NextQ.T)) - CurrentQVal))
     #print(stepvals)
     #print("act", env.Getact(Action), "rew", nextreward, "diff", newQValue - CurrentQ[Action], "Qval", CurrentQ[Action])
     #print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
-    CurrentQ[int(Action)] = newQValue
+    CurrentQ[Action] = newQValue
     return CurrentQ
 
 def train(Qnetwork,TDnet,State,Action,Reward,NextState):
+    #State.iloc[i + p * episodes].values
     next = np.array(empty([1, inputNode]))
-    update = np.array(empty([1, inputNode]))
-    thisQ = np.array(empty([1, inputNode]))
-    next[0] = NextState
-    thisQ[0] = State
-    qVals = Qnetwork.predict(thisQ)
-    nextq = TDnet.predict(next)
-    #v = qVals[0][Action]
-    updatedQ = findQdif(Action, discount, alpha, qVals[0], nextq[0], Reward)
-    update[0] = updatedQ
-    Qnetwork.fit(thisQ, update, batch_size=1,epochs=1, verbose=0)
+    update = np.array(empty([batchSize, outputs]))
+    curState = np.array(empty([1, inputNode]))
+    stateBatch = np.array(empty([batchSize, inputNode]))
+    for x in range(0, batchSize):
+        num = randint(0, (i + p * episodes))
+        next[0] = NextState.iloc[num].values
+        curState[0] = State.iloc[num].values
+        stateBatch[x] = curState[0]
+        qVals = Qnetwork.predict(curState)
+        nextq = TDnet.predict(next)
+        updatedQ = findQdif(Action[num], discount, alpha, qVals[0], nextq[0], Reward[num])
+        update[x] = updatedQ
+    Qnetwork.fit(stateBatch, update, batch_size=1,epochs=5, verbose=0)
     return Qnetwork
 
 def getact(action):
@@ -101,14 +98,16 @@ target = load_model('untrained.h5')
 percent = 0
 finalBal = []
 count = []
-actions = np.array(empty([env.trainLen*episodes]))
+batchSize = 5
+actions = np.array(empty([env.trainLen*episodes],int))
 curQ = np.array(empty([env.trainLen*episodes, outputs]))
 nextQ = np.array(empty([env.trainLen*episodes,outputs]))
 nextreward = np.array(empty([env.trainLen*episodes,1]))
 #state = np.array(empty([env.trainLen*episodes,inputNode]))
 nextstate = np.array(empty([env.trainLen*episodes,inputNode]))
-state = pd.DataFrame(columns=['Close', 'Open', 'isopen', 'direction'])
-nextState = pd.DataFrame(columns=['Close', 'Open', 'isopen', 'direction'])
+cols = env.colnames+(['isopen', 'direction'])
+state = pd.DataFrame(columns=cols)
+nextState = pd.DataFrame(columns=cols)
 for p in range(0, episodes):# for each episode
 
     #colnums = env.data.columns.values
@@ -120,7 +119,7 @@ for p in range(0, episodes):# for each episode
 
     print("EPISODE",p)
     # init
-    greedChance = 0.7 + 0.2 * log(p + 1, episodes)
+    greedChance = 0.8 + 0.2 * log(p + 1, episodes)
     start = time.time()
 
     for i in range(0, 200):#env.trainLen):
@@ -148,7 +147,9 @@ for p in range(0, episodes):# for each episode
         nextreward[i+p*episodes] = env.Takeact(actions[i+p*episodes])
         #curQ[i+p*episodes] = findQdif(actions[i+p*episodes], actionQVal, discount, alpha, curQ[i+p*episodes], nextQ[i+p*episodes],nextreward[i+p*episodes])
 
-        Qnet = train(Qnet, target, state.iloc[i+p*episodes].values, int(actions[i + p * episodes]), nextreward[i + p * episodes], nextState.iloc[i+p*episodes].values)
+
+        if (i+p*episodes)>=batchSize:
+            Qnet = train(Qnet, target, state, actions, nextreward, nextState)
         #outtest = np.array(empty([1, outputs]))
         #outtest[0] = curQ[i+p*episodes]
 
