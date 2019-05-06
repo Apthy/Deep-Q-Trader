@@ -6,24 +6,24 @@ class ForEnvir:
 
     def __init__(self):
 
-        path = "data/sineTest.csv"
-        #self.colnames = ['Close', 'Open', 'High', 'Low', 'SMA200', 'EMA15', 'EMA12', 'EMA26',
-        #            'MACD', 'Bollinger_band_upper_3sd_200', 'bollinger_band_lower_3sd_200', 'StochK',
-        #            'StockD']
-        self.colnames = ['Close', 'Open']
+        path = "data/GBPUSD.csv"
+        self.colnames = ['Close', 'Open', 'High', 'Low', 'SMA200', 'EMA15', 'EMA12', 'EMA26',
+                    'MACD', 'Bollinger_band_upper_3sd_200', 'bollinger_band_lower_3sd_200', 'StochK',
+                    'StockD']
+        #self.colnames = ['Close', 'Open']
         self.data = pd.read_csv(path, names=self.colnames)  # load data
-        #self.data.drop(labels=['High','Low', 'EMA15', 'EMA12', 'EMA26'], axis=1, inplace=True)
+        self.data.drop(labels=['High','Low', 'EMA15', 'EMA12', 'EMA26'], axis=1, inplace=True)
         self.length, self.colnums = self.data.shape
         self.netinputs = self.NormaliseData()
         self.currentStep = 0
 
         (trainNum, null) = divmod(self.length * 8, 10)  # divide the data into training and test sets
 
-        self.x_train = self.data.iloc[0:trainNum]  # split it into 2 data sets to test on and prevent over-fitting
-        self.x_trainAug = self.data.iloc[
-                          0:trainNum + 1]  # split it into 2 data sets to test on and prevent over-fitting
-        self.x_test = self.data.iloc[trainNum:self.length - 1]
-        self.x_test_aug = self.data.iloc[trainNum:self.length]
+        self.x_train = self.netinputs.iloc[0:trainNum]  # split it into 2 data sets to test on and prevent over-fitting
+        self.x_trainAug = self.netinputs.iloc[0:trainNum + 1]
+
+        self.x_test = self.netinputs.iloc[trainNum:self.length - 1]
+        self.x_test_aug = self.netinputs.iloc[trainNum:self.length]
         self.trainLen = len(self.x_train)
         self.testLen = len(self.x_test)
 
@@ -31,28 +31,17 @@ class ForEnvir:
         self.startpip = 0.00
         self.endpip = 0.00
         self.direction = -1
-        self.amount = 100
+        self.amount = 1000
         self.isopen = 0
         self.Updatebars()
-        # self.close = 0
-        # self.open = 0
-        # self.high = 0
-        # self.low = 0
-        # self.sma200 = 0
-        # self.ema15 = 0
-        # self.ema12 = 0
-        # self.ema26 = 0
-        # self.macd = 0
-        # self.bollingerbandupper3sd200 = 0
-        # self.bollingerbandlower3sd200 = 0
-        # self.stochK = 0
-        # self.stockD = 0
+
 
     #
     # to close a trade
     def Close(self):
         bal = self.balance
         dir = self.direction
+        self.Updatebars()
         #self.endpip = self.data.Close[self.currentStep]
         if self.isopen == 1:  # if there is a trade open
             if self.direction == 1:  # if it is going up
@@ -63,9 +52,10 @@ class ForEnvir:
                 self.balance = self.balance + ((1+dif) * self.amount)
             self.isopen = 0
             reward = (dif)*self.amount  # dif of balance
-            self.direction=-1
+            self.direction= -1
         else:  # if there is no trade open there is no reward
-            return -1
+            return -0.1
+
         #print('Direction:', dir, ' P/L:', round((dif)*self.amount,5),' Reward:',round(reward/5,5), 'difference',round(dif,5),' balance:', round(self.balance,5))
         return reward/self.amount
 
@@ -80,13 +70,15 @@ class ForEnvir:
                 dif = self.startpip - endpip
             reward = (1+dif) * self.amount  # change of balance
         else:  # if there is no trade open there is no reward
-            return -1
+            return 0
+        if reward < 1:
+            return -0.1
         return reward/self.amount
 
 
     # direction is a boolean of 1 being up 0 being down
     def Buy(self):
-        rew = -0.1
+        rew = 0
         if self.isopen == 0:  # no trade open
             self.Updatebars()
             self.balance = self.balance - self.amount
@@ -103,7 +95,7 @@ class ForEnvir:
         return rew
 
     def Sell(self):
-        rew = -0.1
+        rew = 0
         if self.isopen == 0:
             self.Updatebars()
             self.balance = self.balance - self.amount
@@ -209,5 +201,13 @@ class ForEnvir:
         data = pd.DataFrame(preprocessing.normalize(self.data, 'max', 0), None, self.data.columns)
         # l1 shrinks the less important features, l2 prevents overfitting
         return data
+
+    def Getcols(self):
+        state = self.Getstate()
+        cols = state.columns.values
+        return cols
+    def TestReset(self):
+        self.Resetenv()
+        self.currentStep = self.trainLen
 
 

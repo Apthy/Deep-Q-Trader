@@ -11,6 +11,7 @@ from keras.models import load_model, save_model
 from keras.callbacks import TensorBoard
 from random import random, randint
 
+
 def barpredictor():
     inputNode = 2
     layers = 4
@@ -19,12 +20,16 @@ def barpredictor():
     env = ForEnvir()
     barpredictor = mlp(inputNode, outputs, layers, layer_depth)
     return barpredictor
+
+
 def actFromQ(QVal,qcolumn):
     act = -1
     for i in range(0, outputs):  # find the action assosiated with this qval
         if QVal == qcolumn[i]:
             act = i  # the action associated to the maxQval
     return act
+
+
 def epsilonGreed(greedChance, qcolumn):
     if greedChance >= random():  # if it is greedy pick the best
         QVal = max(qcolumn)
@@ -32,6 +37,7 @@ def epsilonGreed(greedChance, qcolumn):
     else:  # else pick a random
         act = randint(0, outputs-1)
         QVal = qcolumn[act]
+    #print(act,'  ', qcolumn)
     return int(act), QVal
 
 
@@ -44,6 +50,17 @@ def findQdif(Action, Discount, Alpha, CurrentQ, NextQ, Nextreward):
     #print('~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~')
     CurrentQ[Action] = newQValue
     return CurrentQ
+
+
+# def test(Qnetwork, TDnet, States):
+#     env.TestReset()
+#     for v in range(0,env.testLen):
+#         # get the Qcolumn given the state
+#         Qnetwork.predict()
+#         #epsilonGreed(1,)
+#         #compare the best current action with the difference of the QValues
+#     return 0
+
 
 def train(Qnetwork,TDnet,State,Action,Reward,NextState):
     #State.iloc[i + p * episodes].values
@@ -60,7 +77,7 @@ def train(Qnetwork,TDnet,State,Action,Reward,NextState):
         nextq = TDnet.predict(next)
         updatedQ = findQdif(Action[num], discount, alpha, qVals[0], nextq[0], Reward[num])
         update[x] = updatedQ
-    Qnetwork.fit(stateBatch, update, batch_size=1,epochs=5, verbose=0)
+    Qnetwork.fit(stateBatch, update, batch_size=5,epochs=5, verbose=0)
     return Qnetwork
 
 def getact(action):
@@ -75,26 +92,23 @@ def getact(action):
     return rew
 
 
+env = ForEnvir()
+cols =env.Getcols()
 
 episodes = 100
 alpha = 0.005
 discount = 0.8
 save = 1
-#print(env.colnums)
-inputNode = 4
-layers = 16
+inputNode = len(cols)
+layers = 1
 outputs = 4
-layer_depth = 128
-env = ForEnvir()
+layer_depth = 500
+
 Qnet = mlp(inputNode, outputs, layers, layer_depth)  # make an mlp
 allSave = 1
 Qnet.save('untrained.h5')
 target = load_model('untrained.h5')
 
-#bp = barpredictor()
-
-#model = load_model('my_model.h5')
-#print(env.Getstate())
 percent = 0
 finalBal = []
 count = []
@@ -103,9 +117,9 @@ actions = np.array(empty([env.trainLen*episodes],int))
 curQ = np.array(empty([env.trainLen*episodes, outputs]))
 nextQ = np.array(empty([env.trainLen*episodes,outputs]))
 nextreward = np.array(empty([env.trainLen*episodes,1]))
-#state = np.array(empty([env.trainLen*episodes,inputNode]))
 nextstate = np.array(empty([env.trainLen*episodes,inputNode]))
-cols = env.colnames+(['isopen', 'direction'])
+
+
 state = pd.DataFrame(columns=cols)
 nextState = pd.DataFrame(columns=cols)
 for p in range(0, episodes):# for each episode
@@ -122,21 +136,23 @@ for p in range(0, episodes):# for each episode
     greedChance = 0.8 + 0.2 * log(p + 1, episodes)
     start = time.time()
 
-    for i in range(0, 200):#env.trainLen):
+    for i in range(0, env.trainLen):
         #calculate percentages
         #newP =int(100*((i)/(env.trainLen)))
         #if percent != newP:
         #    print(i, '/', env.trainLen)
        # percent = newP
           #Q-learning
+
         state = state.append(env.Getstate())  #get the current state
-        #traininput = traininput.append(state[i+p*episodes])
-        #curQ[i+p*episodes] = (Qnet.predict(env.Getstate()))  # get q values of the pass
-        (actions[i + p * episodes], actionQVal) = epsilonGreed(greedChance, curQ[i + p * episodes])#select an action
+        curState = np.array(empty([1,inputNode]))
+        curState[0] = state.iloc[i + p * episodes].values
+        qvals = Qnet.predict(curState)
+        (actions[i + p * episodes], actionQVal) = epsilonGreed(greedChance,qvals[0])#select an action
 
         #print('\n\n\n\n\n', env.PeakNextState(),'\n\n\n\n\n')
         nextState =nextState.append(env.PeakNextState(actions[i + p * episodes]))
-        t = nextState.iloc[i + p * episodes].values
+
         n = np.array(empty([1,inputNode]))
         n[0] = nextState.iloc[i + p * episodes].values
 
@@ -145,22 +161,11 @@ for p in range(0, episodes):# for each episode
 
         # update the target list
         nextreward[i+p*episodes] = env.Takeact(actions[i+p*episodes])
-        #curQ[i+p*episodes] = findQdif(actions[i+p*episodes], actionQVal, discount, alpha, curQ[i+p*episodes], nextQ[i+p*episodes],nextreward[i+p*episodes])
 
-
-        if (i+p*episodes)>=batchSize:
+        if (i+p*episodes)>= batchSize:
             Qnet = train(Qnet, target, state, actions, nextreward, nextState)
-        #outtest = np.array(empty([1, outputs]))
-        #outtest[0] = curQ[i+p*episodes]
 
-        #inTest = np.array(empty([1,inputNode]))
-        #inTest[0] = state.iloc[0].values
-
-
-        #print(inTest.shape)
-        #Qnet.fit(inTest,outtest, batch_size=1,epochs=1, verbose=0)
         env.Nextstate()
-    #curQ = np.delete(curQ, le, axis=0)  # delete the final row
     env.Close()
     initbal = 1000000
     if p == 0:
@@ -170,15 +175,14 @@ for p in range(0, episodes):# for each episode
         target.set_weights(Qnet.get_weights())
         #target = load_model('untrained.h5')
         print('PASS PROGRESS SAVED')
-    else:  # if you diddnt then dont save
+    else:  # if you didnt then dont save
         Qnet.set_weights(target.get_weights())
         print('FAIL PROGRESS NOT SAVED')
     totalTime = time.time() - start
     estTime = totalTime*(episodes-p)
     estTime = estTime/(60*60)
+    # test(Qnet, target, env.x_test)
 
-    tfcb = TensorBoard(log_dir='/TensorBoardResults/'+str(p)+"/", histogram_freq=0,
-                       write_graph=True, write_images=True)
 
     if save == 1:
         Qnet.save('my_model.h5')
@@ -190,7 +194,7 @@ for p in range(0, episodes):# for each episode
     minbal = min(finalBal)
 
     if (p+1) % 10 == 0:
-        plt.axis([0, episodes, minbal,maxbal])
+        plt.axis([0, episodes, minbal, maxbal])
         plt.xlabel('episodes')
         plt.ylabel('account balance')
         plt.plot(count, finalBal)
@@ -205,8 +209,6 @@ for p in range(0, episodes):# for each episode
 #greedChance = 1
 #(actions, actionQVal) = epsilonGreed(greedChance, curQ) # perform entirely greedy selection to get the best q vals
 #curQ = findQdif(x_test_aug, actions, actionQVal, discount, alpha, curQ) # find out ohw much they are going to change
-
-#curQ = np.delete(curQ, le2, axis=0)  # delete the final row
 
 #Qnet.evaluate(x_test, curQ)
 
