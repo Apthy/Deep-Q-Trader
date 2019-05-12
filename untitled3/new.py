@@ -63,13 +63,13 @@ def findQdif(Action, Discount, Alpha, CurrentQ, NextQ, Nextreward):
 
 
 def train(Qnetwork,TDnet,State,Action,Reward,NextState):
-    #State.iloc[i + p * episodes].values
+
     next = np.array(empty([1, inputNode]))
     update = np.array(empty([batchSize, outputs]))
     curState = np.array(empty([1, inputNode]))
     stateBatch = np.array(empty([batchSize, inputNode]))
     for x in range(0, batchSize):
-        num = randint(0, (i + p * episodes))
+        num = randint(p * episodes, (i + p * episodes))  # only learn from your experience of the current episode
         next[0] = NextState.iloc[num].values
         curState[0] = State.iloc[num].values
         stateBatch[x] = curState[0]
@@ -77,7 +77,9 @@ def train(Qnetwork,TDnet,State,Action,Reward,NextState):
         nextq = TDnet.predict(next)
         updatedQ = findQdif(Action[num], discount, alpha, qVals[0], nextq[0], Reward[num])
         update[x] = updatedQ
-    Qnetwork.fit(stateBatch, update, batch_size=5,epochs=5, verbose=0)
+    curloss = Qnetwork.fit(stateBatch, update,shuffle=False, batch_size=5,epochs=5, verbose=0)
+    loss.append(sum(curloss.history['loss'])/5)
+
     return Qnetwork
 
 def getact(action):
@@ -118,8 +120,8 @@ curQ = np.array(empty([env.trainLen*episodes, outputs]))
 nextQ = np.array(empty([env.trainLen*episodes,outputs]))
 nextreward = np.array(empty([env.trainLen*episodes,1]))
 nextstate = np.array(empty([env.trainLen*episodes,inputNode]))
-
-
+episodicLoss = []
+episodicReward = []
 state = pd.DataFrame(columns=cols)
 nextState = pd.DataFrame(columns=cols)
 for p in range(0, episodes):# for each episode
@@ -130,10 +132,10 @@ for p in range(0, episodes):# for each episode
     #traininput = pd.DataFrame(columns=['Close', 'Open', 'SMA200',
     #                'MACD', 'Bollinger_band_upper_3sd_200', 'bollinger_band_lower_3sd_200', 'StochK',
     #                'StockD','isopen','direction'])
-
+    loss = []
     print("EPISODE",p)
     # init
-    greedChance = 0.8 + 0.2 * log(p + 1, episodes)
+    greedChance = 0.8 + 0.25 * log(p + 1, episodes)
     start = time.time()
 
     for i in range(0, env.trainLen):
@@ -192,13 +194,34 @@ for p in range(0, episodes):# for each episode
     env.Resetenv()
     maxbal = abs(max(finalBal))
     minbal = min(finalBal)
-
+    episodicLoss.append(sum(loss))
+    sumrew = sum(nextreward)
+    episodicReward.append(sum(nextreward[p*env.trainLen: env.trainLen * p +env.trainLen-1]))
     if (p+1) % 10 == 0:
+        plt.figure(1)
+        plt.subplot(311)
         plt.axis([0, episodes, minbal, maxbal])
-        plt.xlabel('episodes')
+        plt.xlabel('Episodes')
         plt.ylabel('account balance')
         plt.plot(count, finalBal)
+        plt.subplot(312)
+        plt.plot(count, episodicLoss)
+        plt.title('Model loss')
+        plt.ylabel('Loss')
+        plt.xlabel('Episode')
+        plt.subplot(313)
+        plt.plot(count, episodicReward)
+        plt.title('Model reward')
+        plt.ylabel('reward')
+        plt.xlabel('Episode')
         plt.show()
+
+    # plt.plot(loss)
+    # plt.title('Model accuracy')
+    # plt.ylabel('Accuracy')
+    # plt.xlabel('Epoch')
+    # plt.show()
+
 
 
 #once you change the course

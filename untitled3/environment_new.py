@@ -59,22 +59,17 @@ class ForEnvir:
         #print('Direction:', dir, ' P/L:', round((dif)*self.amount,5),' Reward:',round(reward/5,5), 'difference',round(dif,5),' balance:', round(self.balance,5))
         return reward/self.amount
 
-
     def GetTradeVal(self,curstep):
-        bal = self.balance
         endpip = self.data.Close[curstep]
         if self.isopen == 1:  # if there is a trade open
             if self.direction == 1:  # if it is going up
                 dif = endpip - self.startpip
             else:  # going down
                 dif = self.startpip - endpip
-            reward = (1+dif) * self.amount  # change of balance
+            reward = (dif) * self.amount  # change of balance
         else:  # if there is no trade open there is no reward
             return 0
-        if reward < 1:
-            return -0.1
         return reward/self.amount
-
 
     # direction is a boolean of 1 being up 0 being down
     def Buy(self):
@@ -85,13 +80,13 @@ class ForEnvir:
             self.isopen = 1
             self.direction = 1
             rew = 0.1
-        #else:  # trade open
-        #    if self.direction == 0:  # if it is the oposite
-        #        rew = self.Close()
-        #        self.Updatebars()
-        #        self.balance = self.balance - self.amount
-        #        self.isopen = 1
-        #        self.direction = 1
+        else:  # trade open
+            if self.direction == 0:  # if it is the oposite
+                rew = self.Close()
+                self.Updatebars()
+                self.balance = self.balance - self.amount
+                self.isopen = 1
+                self.direction = 1
         return rew
 
     def Sell(self):
@@ -102,18 +97,19 @@ class ForEnvir:
             self.isopen = 1
             self.direction = 0
             rew = 0.1
-        #else:  # if there is a trade open
-        #
-        #    if self.direction == 1:  # if it is the opposite
-        #        rew = self.Close()
-        #        self.Updatebars()
-        #        self.balance = self.balance - self.amount
-        #        self.isopen = 1
-        #        self.direction = 0
+        else:  # if there is a trade open
+
+            if self.direction == 1:  # if it is the opposite
+                rew = self.Close()
+                self.Updatebars()
+                self.balance = self.balance - self.amount
+                self.isopen = 1
+                self.direction = 0
         return rew
 
     def Hold(self):
-        return 0
+        rew =self.GetTradeVal(self.currentStep)/0.005
+        return rew
 
     def TestSell(self):
         if self.isopen == 0:
