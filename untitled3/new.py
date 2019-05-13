@@ -69,7 +69,10 @@ def train(Qnetwork,TDnet,State,Action,Reward,NextState):
     curState = np.array(empty([1, inputNode]))
     stateBatch = np.array(empty([batchSize, inputNode]))
     for x in range(0, batchSize):
-        num = randint(p * episodes, (i + p * episodes))  # only learn from your experience of the current episode
+        if x ==0:#learn from the current value
+            num= i + p * maxItem
+        else:#learn from experience
+            num = randint(p * maxItem, (i + p * maxItem))  # only learn from your experience of the current episode
         next[0] = NextState.iloc[num].values
         curState[0] = State.iloc[num].values
         stateBatch[x] = curState[0]
@@ -124,47 +127,42 @@ episodicLoss = []
 episodicReward = []
 state = pd.DataFrame(columns=cols)
 nextState = pd.DataFrame(columns=cols)
+maxItem = env.trainLen
 for p in range(0, episodes):# for each episode
 
-    #colnums = env.data.columns.values
-    #colnums = np.append(colnums,['isopen','direction'])
-    #colnums = pd.Series(colnums)
-    #traininput = pd.DataFrame(columns=['Close', 'Open', 'SMA200',
-    #                'MACD', 'Bollinger_band_upper_3sd_200', 'bollinger_band_lower_3sd_200', 'StochK',
-    #                'StockD','isopen','direction'])
     loss = []
     print("EPISODE",p)
     # init
-    greedChance = 0.8 + 0.25 * log(p + 1, episodes)
+    greedChance = 0.8 + 0.305 * log(p + 1, episodes)
     start = time.time()
 
-    for i in range(0, env.trainLen):
+    for i in range(0, maxItem):
         #calculate percentages
         #newP =int(100*((i)/(env.trainLen)))
         #if percent != newP:
         #    print(i, '/', env.trainLen)
        # percent = newP
           #Q-learning
-
+        rowNum = i + p * maxItem
         state = state.append(env.Getstate())  #get the current state
         curState = np.array(empty([1,inputNode]))
-        curState[0] = state.iloc[i + p * episodes].values
+        curState[0] = state.iloc[rowNum].values
         qvals = Qnet.predict(curState)
-        (actions[i + p * episodes], actionQVal) = epsilonGreed(greedChance,qvals[0])#select an action
+        (actions[rowNum], actionQVal) = epsilonGreed(greedChance, qvals[0])#select an action
 
         #print('\n\n\n\n\n', env.PeakNextState(),'\n\n\n\n\n')
-        nextState =nextState.append(env.PeakNextState(actions[i + p * episodes]))
+        nextState = nextState.append(env.PeakNextState(actions[rowNum]))
 
-        n = np.array(empty([1,inputNode]))
-        n[0] = nextState.iloc[i + p * episodes].values
+        n = np.array(empty([1, inputNode]))
+        n[0] = nextState.iloc[i + p * maxItem].values
 
         # calculate the q target values
-        nextQ[i+p*episodes] = target.predict(n)  # get q values of the next pass
+        nextQ[rowNum] = target.predict(n)  # get q values of the next pass
 
         # update the target list
-        nextreward[i+p*episodes] = env.Takeact(actions[i+p*episodes])
+        nextreward[rowNum] = env.Takeact(actions[rowNum])
 
-        if (i+p*episodes)>= batchSize:
+        if (i)>= batchSize: ##you cant train on with less than your batch size of items
             Qnet = train(Qnet, target, state, actions, nextreward, nextState)
 
         env.Nextstate()
@@ -185,42 +183,40 @@ for p in range(0, episodes):# for each episode
     estTime = estTime/(60*60)
     # test(Qnet, target, env.x_test)
 
-
-    if save == 1:
-        Qnet.save('my_model.h5')
+    Qnet.save('my_model.h5')
     finalBal.append(env.balance)
     count.append(p)
-    print('Episode ended with:', env.balance, '|  ETA:', round(estTime, 2), 'hours | chance:', greedChance)
-    env.Resetenv()
     maxbal = abs(max(finalBal))
     minbal = min(finalBal)
     episodicLoss.append(sum(loss))
-    sumrew = sum(nextreward)
-    episodicReward.append(sum(nextreward[p*env.trainLen: env.trainLen * p +env.trainLen-1]))
+    rewvalues = nextreward[p * env.trainLen: env.trainLen * (p+1) - 1]
+    sumrew = sum(nextreward[p * env.trainLen: env.trainLen * (p+1) - 1])
+    episodicReward.append(sum(nextreward[p * env.trainLen: env.trainLen * (p+1) - 1]))
+    print('Episode ended with:', env.balance, '|  ETA:', round(estTime, 2), 'hours | chance:', greedChance*100, '% | total Reward:', episodicReward[p])
+    env.Resetenv()
+
+
     if (p+1) % 10 == 0:
         plt.figure(1)
-        plt.subplot(311)
+        plt.subplot(211)
         plt.axis([0, episodes, minbal, maxbal])
+        plt.title('account balance')
         plt.xlabel('Episodes')
         plt.ylabel('account balance')
         plt.plot(count, finalBal)
-        plt.subplot(312)
+        plt.subplot(212)
         plt.plot(count, episodicLoss)
         plt.title('Model loss')
         plt.ylabel('Loss')
         plt.xlabel('Episode')
-        plt.subplot(313)
-        plt.plot(count, episodicReward)
-        plt.title('Model reward')
-        plt.ylabel('reward')
-        plt.xlabel('Episode')
+        # plt.subplot(313)
+        # plt.plot(count, episodicReward)
+        # plt.title('Model reward')
+        # plt.ylabel('reward')
+        # plt.xlabel('Episode')
         plt.show()
 
-    # plt.plot(loss)
-    # plt.title('Model accuracy')
-    # plt.ylabel('Accuracy')
-    # plt.xlabel('Epoch')
-    # plt.show()
+
 
 
 

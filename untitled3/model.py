@@ -4,7 +4,7 @@ from keras.optimizers import Adam, RMSprop
 
 
 def mlp(n_obs, n_action, n_hidden_layer=1, n_neuron_per_layer=32,
-        activation='sigmoid', loss='mse'):
+        activation='relu', loss='mse'):
     model = Sequential()
     model.add(Dense(n_neuron_per_layer, input_dim=n_obs, activation=activation))
     for _ in range(n_hidden_layer):
