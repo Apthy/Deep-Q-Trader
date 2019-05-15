@@ -131,9 +131,9 @@ maxItem = env.trainLen
 for p in range(0, episodes):# for each episode
 
     loss = []
-    print("EPISODE",p)
+    print("EPISODE", p)
     # init
-    greedChance = 0.8 + 0.305 * log(p + 1, episodes)
+    greedChance = 0.7 + 0.305 * log(p + 1, episodes)
     start = time.time()
 
     for i in range(0, maxItem):
@@ -189,46 +189,30 @@ for p in range(0, episodes):# for each episode
     maxbal = abs(max(finalBal))
     minbal = min(finalBal)
     episodicLoss.append(sum(loss))
-    rewvalues = nextreward[p * env.trainLen: env.trainLen * (p+1) - 1]
-    sumrew = sum(nextreward[p * env.trainLen: env.trainLen * (p+1) - 1])
-    episodicReward.append(sum(nextreward[p * env.trainLen: env.trainLen * (p+1) - 1]))
-    print('Episode ended with:', env.balance, '|  ETA:', round(estTime, 2), 'hours | chance:', greedChance*100, '% | total Reward:', episodicReward[p])
+
+    sumrew = sum(nextreward[p * maxItem: maxItem * (p+1)])
+    episodicReward.append(sumrew)
+    print('Episode ended with:', env.balance, '|  ETA:', round(estTime, 2), 'hours | chance:', greedChance * 100, '% | total Reward:', episodicReward[p])
     env.Resetenv()
 
 
-    if (p+1) % 10 == 0:
-        plt.figure(1)
-        plt.subplot(211)
-        plt.axis([0, episodes, minbal, maxbal])
-        plt.title('account balance')
-        plt.xlabel('Episodes')
-        plt.ylabel('account balance')
-        plt.plot(count, finalBal)
-        plt.subplot(212)
-        plt.plot(count, episodicLoss)
-        plt.title('Model loss')
-        plt.ylabel('Loss')
-        plt.xlabel('Episode')
-        # plt.subplot(313)
-        # plt.plot(count, episodicReward)
-        # plt.title('Model reward')
-        # plt.ylabel('reward')
-        # plt.xlabel('Episode')
-        plt.show()
-
-
-
-
-
-#once you change the course
-#curQ = Qnet.predict(x_test_aug, 1)  # get the current output of the network
-#actionQVal = []
-#actions = []
-#env = OrderActions()
-#greedChance = 1
-#(actions, actionQVal) = epsilonGreed(greedChance, curQ) # perform entirely greedy selection to get the best q vals
-#curQ = findQdif(x_test_aug, actions, actionQVal, discount, alpha, curQ) # find out ohw much they are going to change
-
-#Qnet.evaluate(x_test, curQ)
-
-
+    plt.figure(1)
+    plt.subplot(311)
+    plt.axis([0, episodes, minbal, maxbal])
+    plt.title('account balance')
+    plt.xlabel('Episodes')
+    plt.ylabel('account balance')
+    plt.plot(count, finalBal)
+    plt.subplot(312)
+    plt.xlim(0,100)
+    plt.plot(count, episodicLoss)
+    plt.title('Model loss')
+    plt.ylabel('Loss')
+    plt.xlabel('Episode')
+    plt.subplot(313)
+    plt.xlim(0, 100)
+    plt.plot(count, episodicReward)
+    plt.title('Model reward')
+    plt.ylabel('reward')
+    plt.xlabel('Episode')
+    plt.show()
